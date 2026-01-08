@@ -30,7 +30,7 @@ jobs:
 
       - name: Build
         env:
-          VITE_APP_NAME: GMeet Add-on PoC
+          VITE_APP_NAME: ${{ vars.VITE_APP_NAME }}
           VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.VITE_GOOGLE_PROJECT_NUMBER }}
           VITE_MAIN_STAGE_URL: ${{ vars.VITE_MAIN_STAGE_URL }}
         run: npm run build
