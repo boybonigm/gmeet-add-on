@@ -23,7 +23,7 @@ export default function App() {
             <nav className="flex gap-3 text-sm font-medium">
               <Link
                 className="rounded-full border border-ink/10 bg-white/90 px-4 py-2 transition hover:-translate-y-0.5 hover:border-ink/30"
-                to="/mainstage"
+                to="/"
               >
                 Main Stage
               </Link>
@@ -39,7 +39,6 @@ export default function App() {
 
         <Routes>
           <Route path="/" element={<MainStage />} />
-          <Route path="/mainstage" element={<MainStage />} />
           <Route path="/sidepanel" element={<SidePanel />} />
         </Routes>
       </div>

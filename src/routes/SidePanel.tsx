@@ -1,5 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { createMessageChannel, SidePanelPayload } from "../components/messageBus";
+import { useEffect, useState } from "react";
+import {
+  meet,
+  MeetSidePanelClient,
+} from '@googleworkspace/meet-addons/meet.addons';
 
 const quickPrompts = [
   "Welcome everyone! Let's align on the agenda.",
@@ -10,28 +13,41 @@ const quickPrompts = [
 export default function SidePanel() {
   const [sender, setSender] = useState("Side panel");
   const [message, setMessage] = useState(quickPrompts[0]);
-  const [status, setStatus] = useState("Idle");
+  const [sidePanelClient, setSidePanelClient] = useState<MeetSidePanelClient>();
 
-  const channel = useMemo(() => createMessageChannel(), []);
 
-  useEffect(() => {
-    return () => {
-      channel.close();
-    };
-  }, [channel]);
+  // Launches the main stage when the main button is clicked.
+  async function startActivity(event: React.FormEvent<HTMLFormElement>) {
+    if (!sidePanelClient) {
+      throw new Error('Side Panel is not yet initialized!');
+    }
 
-  const submitMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const payload: SidePanelPayload = {
+    const payload = {
       sender: sender.trim() || "Side panel",
       message: message.trim() || "(empty message)",
       submittedAt: new Date().toISOString()
     };
 
-    channel.postMessage(payload);
-    setStatus(`Sent at ${new Date(payload.submittedAt).toLocaleTimeString()}`);
-  };
+    await sidePanelClient.startActivity({
+      mainStageUrl: import.meta.env.VITE_MAIN_STAGE_URL,
+      additionalData: JSON.stringify(payload),
+    });
+  }
+
+  /**
+     * Prepares the add-on Side Panel Client.
+     */
+  useEffect(() => {
+    (async () => {
+      const session = await meet.addon.createAddonSession({
+        cloudProjectNumber: import.meta.env.VITE_GOOGLE_PROJECT_NUMBER,
+      });
+      setSidePanelClient(await session.createSidePanelClient());
+    })();
+  }, []);
+
 
   return (
     <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -42,7 +58,7 @@ export default function SidePanel() {
           This simulates the side panel experience in a Google Meet add-on.
         </p>
 
-        <form className="mt-6 flex flex-col gap-4" onSubmit={submitMessage}>
+        <form className="mt-6 flex flex-col gap-4" onSubmit={startActivity}>
           <label className="text-sm font-medium text-ink/80">
             Sender label
             <input
@@ -78,21 +94,9 @@ export default function SidePanel() {
             className="mt-2 rounded-2xl bg-ocean px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-ink"
             type="submit"
           >
-            Send to main stage
+            Start Activity
           </button>
         </form>
-      </div>
-
-      <div className="rounded-3xl bg-white/80 p-6 shadow-xl">
-        <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Status</p>
-        <h3 className="mt-3 font-display text-xl font-semibold text-ink">Channel activity</h3>
-        <p className="mt-2 text-sm text-ink/70">BroadcastChannel: gmeet-poc-channel</p>
-        <div className="mt-5 rounded-2xl border border-ink/10 bg-haze/60 p-4">
-          <p className="text-sm font-medium text-ink">{status}</p>
-          <p className="mt-2 text-xs text-ink/60">
-            Tip: open the main stage in another tab to see live updates.
-          </p>
-        </div>
       </div>
     </section>
   );

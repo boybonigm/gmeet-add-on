@@ -1,29 +1,27 @@
 import { useEffect, useState } from "react";
-import { createMessageChannel, SidePanelPayload } from "../components/messageBus";
+import { meet, MeetMainStageClient } from '@googleworkspace/meet-addons/meet.addons';
 
-const fallbackMessage: SidePanelPayload = {
-  sender: "Side panel",
-  message: "Waiting for input from the side panel...",
-  submittedAt: new Date().toISOString()
-};
 
 export default function MainStage() {
-  const [latestPayload, setLatestPayload] = useState<SidePanelPayload>(fallbackMessage);
+  const [mainStageClient, setMainStageClient] = useState<MeetMainStageClient>();
+  const [additionalData, setAdditionalData] = useState<string | undefined>(undefined);
 
+  /**
+     * Prepares the add-on Main Stage Client, which signals that the add-on
+     * has successfully launched in the main stage.
+     */
   useEffect(() => {
-    const channel = createMessageChannel();
+    (async () => {
+      const session = await meet.addon.createAddonSession({
+        cloudProjectNumber: import.meta.env.VITE_GOOGLE_PROJECT_NUMBER,
+      });
 
-    channel.onmessage = (event) => {
-      if (!event.data) {
-        return;
-      }
+      const mainStage = await session.createMainStageClient();
+      const activityStartingState = await mainStage.getActivityStartingState();
 
-      setLatestPayload(event.data as SidePanelPayload);
-    };
-
-    return () => {
-      channel.close();
-    };
+      setAdditionalData(activityStartingState.additionalData);
+      setMainStageClient(mainStage);
+    })();
   }, []);
 
   return (
@@ -33,45 +31,9 @@ export default function MainStage() {
         <h2 className="mt-3 font-display text-2xl font-semibold text-ink">
           Live content from the side panel
         </h2>
-        <p className="mt-2 text-sm text-ink/70">
-          This area simulates what a participant sees on the shared main stage.
-        </p>
-
-        <div className="mt-6 rounded-2xl border border-ink/10 bg-haze/50 p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-ink/50">Latest submission</p>
-          <p className="mt-3 text-lg font-semibold text-ink">{latestPayload.message}</p>
-          <div className="mt-4 flex flex-wrap gap-3 text-xs text-ink/60">
-            <span className="rounded-full bg-white px-3 py-1">From: {latestPayload.sender}</span>
-            <span className="rounded-full bg-white px-3 py-1">
-              {new Date(latestPayload.submittedAt).toLocaleString()}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-3xl bg-ink p-6 text-white shadow-xl">
-        <p className="text-xs uppercase tracking-[0.3em] text-white/60">Environment</p>
-        <h3 className="mt-3 font-display text-xl font-semibold">Add-on configuration</h3>
-        <ul className="mt-4 space-y-3 text-sm text-white/80">
-          <li>
-            <span className="text-white/50">Client ID</span>
-            <div className="mt-1 break-all font-medium text-white">
-              {import.meta.env.VITE_GOOGLE_MEET_ADDON_CLIENT_ID}
-            </div>
-          </li>
-          <li>
-            <span className="text-white/50">Project ID</span>
-            <div className="mt-1 break-all font-medium text-white">
-              {import.meta.env.VITE_GOOGLE_MEET_ADDON_PROJECT_ID}
-            </div>
-          </li>
-          <li>
-            <span className="text-white/50">Deployment ID</span>
-            <div className="mt-1 break-all font-medium text-white">
-              {import.meta.env.VITE_GOOGLE_MEET_ADDON_DEPLOYMENT_ID}
-            </div>
-          </li>
-        </ul>
+        <pre className="mt-2 text-sm text-ink/70">
+          {additionalData}
+        </pre>
       </div>
     </section>
   );
