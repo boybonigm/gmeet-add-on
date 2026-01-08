@@ -18,11 +18,11 @@ export default function SidePanel() {
 
   // Launches the main stage when the main button is clicked.
   async function startActivity(event: React.FormEvent<HTMLFormElement>) {
-    if (!sidePanelClient) {
-      throw new Error('Side Panel is not yet initialized!');
-    }
-
     event.preventDefault();
+
+    if (!sidePanelClient) {
+      return;
+    }
 
     const payload = {
       sender: sender.trim() || "Side panel",
@@ -62,6 +62,8 @@ export default function SidePanel() {
           <label className="text-sm font-medium text-ink/80">
             Sender label
             <input
+              required
+              type="text"
               className="mt-2 w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-sm focus:border-ocean focus:outline-none"
               value={sender}
               onChange={(event) => setSender(event.target.value)}
@@ -71,6 +73,8 @@ export default function SidePanel() {
           <label className="text-sm font-medium text-ink/80">
             Message for main stage
             <textarea
+              required
+              rows={4}
               className="mt-2 min-h-[140px] w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-sm focus:border-ocean focus:outline-none"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
