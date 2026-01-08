@@ -30,11 +30,9 @@ jobs:
 
       - name: Build
         env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_APP_NAME: GMeet Add-on PoC
-          VITE_GOOGLE_MEET_ADDON_CLIENT_ID: ${{ vars.VITE_GOOGLE_MEET_ADDON_CLIENT_ID || 'your-client-id.apps.googleusercontent.com' }}
-          VITE_GOOGLE_MEET_ADDON_PROJECT_ID: ${{ vars.VITE_GOOGLE_MEET_ADDON_PROJECT_ID || 'your-project-id' }}
-          VITE_GOOGLE_MEET_ADDON_DEPLOYMENT_ID: ${{ vars.VITE_GOOGLE_MEET_ADDON_DEPLOYMENT_ID || 'your-deployment-id' }}
+          VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.VITE_GOOGLE_PROJECT_NUMBER }}
+          VITE_MAIN_STAGE_URL: ${{ vars.VITE_MAIN_STAGE_URL }}
         run: npm run build
 
       - name: Upload artifact
