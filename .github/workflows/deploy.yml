@@ -34,7 +34,7 @@ jobs:
           VITE_APP_NAME: ${{ vars.VITE_APP_NAME }}
           VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.VITE_GOOGLE_PROJECT_NUMBER }}
           VITE_MAIN_STAGE_URL: ${{ vars.VITE_MAIN_STAGE_URL }}
-          VITE_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
+          VITE_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.VITE_GOOGLE_OAUTH_CLIENT_ID }}
         run: npm run build
 
       - name: Upload artifact
