@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { meet, MeetMainStageClient } from '@googleworkspace/meet-addons/meet.addons';
+import { meet, MeetingInfo, MeetMainStageClient } from '@googleworkspace/meet-addons/meet.addons';
 
 
 export default function MainStage() {
   const [mainStageClient, setMainStageClient] = useState<MeetMainStageClient>();
+  const [meetingInfo, setMeetingInfo] = useState<MeetingInfo>();
   const [additionalData, setAdditionalData] = useState<string | undefined>(undefined);
 
   /**
@@ -17,23 +18,23 @@ export default function MainStage() {
       });
 
       const mainStage = await session.createMainStageClient();
+      const meetingInfo = await mainStage.getMeetingInfo();
       const activityStartingState = await mainStage.getActivityStartingState();
-
-      setAdditionalData(activityStartingState.additionalData);
+      
       setMainStageClient(mainStage);
+      setMeetingInfo(meetingInfo);
+      setAdditionalData(activityStartingState.additionalData);
     })();
   }, []);
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+    <section className="p-5">
       <div className="rounded-3xl bg-white/80 p-6 shadow-xl">
-        <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Main Stage</p>
-        <h2 className="mt-3 font-display text-2xl font-semibold text-ink">
-          Live content from the side panel
-        </h2>
-        <pre className="mt-2 text-sm text-ink/70">
-          {additionalData}
-        </pre>
+        <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Meeting ID</p>
+        <h2 className="font-display text-2xl font-semibold text-ink">{meetingInfo?.meetingId || "Loading..."}</h2>
+        <hr className="my-5" />
+        <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Meeting CODE</p>
+        <h2 className="font-display text-2xl font-semibold text-ink">{meetingInfo?.meetingCode || "Loading..."}</h2>
       </div>
     </section>
   );

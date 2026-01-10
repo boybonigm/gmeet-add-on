@@ -1,32 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import {
   meet,
   MeetSidePanelClient,
 } from '@googleworkspace/meet-addons/meet.addons';
 
-const quickPrompts = [
-  "Welcome everyone! Let's align on the agenda.",
-  "Drop your top priority for today.",
-  "Share one win from the week."
-];
-
 export default function SidePanel() {
-  const [sender, setSender] = useState("Side panel");
-  const [message, setMessage] = useState(quickPrompts[0]);
   const [sidePanelClient, setSidePanelClient] = useState<MeetSidePanelClient>();
-
+  const [user, setUser] = useState<{
+    name: string;
+    email: string;
+    picture: string;
+  } | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const hasSignedIn = useMemo(() => Boolean(user), [user]);
 
   // Launches the main stage when the main button is clicked.
-  async function startActivity(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function startActivity() {
 
-    if (!sidePanelClient) {
+    if (!sidePanelClient || !hasSignedIn) {
       return;
     }
 
     const payload = {
-      sender: sender.trim() || "Side panel",
-      message: message.trim() || "(empty message)",
+      sender: user,
       submittedAt: new Date().toISOString()
     };
 
@@ -36,9 +34,87 @@ export default function SidePanel() {
     });
   }
 
+  function decodeJwtPayload(token: string) {
+    const payload = token.split(".")[1];
+    if (!payload) {
+      throw new Error("Invalid token");
+    }
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload) as {
+      name?: string;
+      email?: string;
+      picture?: string;
+    };
+  }
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+    if (!clientId) {
+      setAuthError("Missing VITE_GOOGLE_OAUTH_CLIENT_ID.");
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const tryInit = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const google = window.google;
+      if (google?.accounts?.id && googleButtonRef.current) {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response: google.accounts.id.CredentialResponse) => {
+            try {
+              const profile = decodeJwtPayload(response.credential);
+
+              setUser({
+                name: profile.name!,
+                email: profile.email!,
+                picture: profile.picture!,
+              });
+              setAuthError(null);
+            } catch (error) {
+              setAuthError((error as Error).message);
+            }
+          }
+        });
+
+        google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          text: "signin_with",
+          shape: "pill"
+        });
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 10) {
+        setTimeout(tryInit, 250);
+      } else {
+        setAuthError("Google Sign-In failed to load.");
+      }
+    };
+
+    tryInit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /**
-     * Prepares the add-on Side Panel Client.
-     */
+   * Prepares the add-on Side Panel Client.
+   */
   useEffect(() => {
     (async () => {
       const session = await meet.addon.createAddonSession({
@@ -50,57 +126,36 @@ export default function SidePanel() {
 
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-      <div className="rounded-3xl bg-white/80 p-6 shadow-xl">
-        <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Side Panel</p>
-        <h2 className="mt-3 font-display text-2xl font-semibold text-ink">Send content to main stage</h2>
-        <p className="mt-2 text-sm text-ink/70">
-          This simulates the side panel experience in a Google Meet add-on.
-        </p>
-
-        <form className="mt-6 flex flex-col gap-4" onSubmit={startActivity}>
-          <label className="text-sm font-medium text-ink/80">
-            Sender label
-            <input
-              required
-              type="text"
-              className="mt-2 w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-sm focus:border-ocean focus:outline-none"
-              value={sender}
-              onChange={(event) => setSender(event.target.value)}
-            />
-          </label>
-
-          <label className="text-sm font-medium text-ink/80">
-            Message for main stage
-            <textarea
-              required
-              rows={4}
-              className="mt-2 min-h-[140px] w-full rounded-2xl border border-ink/10 bg-white px-4 py-3 text-sm focus:border-ocean focus:outline-none"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-            />
-          </label>
-
-          <div className="flex flex-wrap gap-2">
-            {quickPrompts.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => setMessage(prompt)}
-                className="rounded-full border border-ink/10 bg-haze px-3 py-1 text-xs font-medium text-ink/70 transition hover:border-ink/30"
-              >
-                {prompt}
-              </button>
-            ))}
+    <section className="p-5 h-screen flex flex-col">
+      <div className="rounded-3xl bg-white/80 p-6 shadow-xl flex flex-grow flex-col justify-center">
+        {user && (
+          <>
+          <div className="rounded-2xl border border-ink/10 bg-haze/60 p-4 mb-5">
+            <div className="flex items-center gap-3">
+              {user?.picture ? (
+                <img className="h-10 w-10 rounded-full" src={user.picture} alt={user.name ?? "User"} />
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ocean/10 text-sm font-semibold text-ocean">
+                  {(user?.name ?? "U").slice(0, 1)}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-ink">{user?.name}</p>
+                {user?.email ? <p className="text-xs text-ink/60">{user.email}</p> : null}
+              </div>
+            </div>
           </div>
-
-          <button
-            className="mt-2 rounded-2xl bg-ocean px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-ink"
-            type="submit"
-          >
+          <button type="button" onClick={startActivity} className="bg-green-700 hover:bg-green-600 text-white px-5 py-2 rounded-2xl w-full">
             Start Activity
           </button>
-        </form>
+          </>
+        )}
+
+        {!user && (
+          <div>
+            <div ref={googleButtonRef} />
+          </div>
+        )}
       </div>
     </section>
   );

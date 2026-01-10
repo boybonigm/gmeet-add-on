@@ -15,7 +15,10 @@ Open:
 
 ## Environment
 
-Edit `.env` with your values before building or deploying.
+Edit `.env` with your values before building or deploying, especially:
+- `VITE_GOOGLE_PROJECT_NUMBER`
+- `VITE_MAIN_STAGE_URL`
+- `VITE_GOOGLE_OAUTH_CLIENT_ID`
 
 ## GitHub Pages
 
