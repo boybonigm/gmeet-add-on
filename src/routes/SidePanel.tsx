@@ -1,30 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   meet,
   MeetSidePanelClient,
 } from '@googleworkspace/meet-addons/meet.addons';
-import { decodeJwtPayload } from "../utils/jwt";
 
 export default function SidePanel() {
   const [sidePanelClient, setSidePanelClient] = useState<MeetSidePanelClient>();
-  const [user, setUser] = useState<{
-    name: string;
-    email: string;
-    picture: string;
-  } | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-
-  const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   // Launches the main stage when the main button is clicked.
   async function startActivity() {
 
-    if (!sidePanelClient || !user) {
+    if (!sidePanelClient) {
       return;
     }
 
     const payload = {
-      sender: user,
       submittedAt: new Date().toISOString()
     };
 
@@ -33,65 +23,6 @@ export default function SidePanel() {
       additionalData: JSON.stringify(payload),
     });
   }
-
-  useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
-    if (!clientId) {
-      setAuthError("Missing VITE_GOOGLE_OAUTH_CLIENT_ID.");
-      return;
-    }
-
-    let cancelled = false;
-    let attempts = 0;
-
-    const tryInit = () => {
-      if (cancelled) {
-        return;
-      }
-
-      const google = window.google;
-      if (google?.accounts?.id && googleButtonRef.current) {
-        google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response: google.accounts.id.CredentialResponse) => {
-            try {
-              const profile = decodeJwtPayload(response.credential);
-
-              setUser({
-                name: profile.name!,
-                email: profile.email!,
-                picture: profile.picture!,
-              });
-              setAuthError(null);
-            } catch (error) {
-              setAuthError((error as Error).message);
-            }
-          }
-        });
-
-        google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: "outline",
-          size: "large",
-          text: "signin_with",
-          shape: "pill"
-        });
-        return;
-      }
-
-      attempts += 1;
-      if (attempts < 10) {
-        setTimeout(tryInit, 250);
-      } else {
-        setAuthError("Google Sign-In failed to load.");
-      }
-    };
-
-    tryInit();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   /**
    * Prepares the add-on Side Panel Client.
@@ -109,34 +40,9 @@ export default function SidePanel() {
   return (
     <section className="p-5 h-screen flex flex-col">
       <div className="rounded-3xl bg-white/80 p-6 shadow-xl flex flex-grow flex-col justify-center">
-        {authError && <p className="text-red-600 text-center mb-5">{authError}</p>}
-        {user && (
-          <>
-          <div className="rounded-2xl border border-ink/10 bg-haze/60 p-4 mb-5">
-            <div className="flex items-center gap-3">
-              {user?.picture ? (
-                <img className="h-10 w-10 rounded-full" src={user.picture} alt={user.name ?? "User"} />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ocean/10 text-sm font-semibold text-ocean">
-                  {(user?.name ?? "U").slice(0, 1)}
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-semibold text-ink">{user?.name}</p>
-                {user?.email ? <p className="text-xs text-ink/60">{user.email}</p> : null}
-              </div>
-            </div>
-          </div>
           <button type="button" onClick={startActivity} className="bg-green-700 hover:bg-green-600 text-white px-5 py-2 rounded-2xl w-full">
             Start Activity
           </button>
-          </>
-        )}
-        {!user && (
-          <div className="flex items-center justify-center">
-          <div ref={googleButtonRef} />
-          </div>
-        )}
       </div>
     </section>
   );
