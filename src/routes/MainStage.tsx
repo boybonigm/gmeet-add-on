@@ -131,10 +131,7 @@ export default function MainStage() {
         hangoutLink?: string;
         conferenceData?: { entryPoints?: Array<{ uri?: string }> };
       }) => {
-        const link = item.hangoutLink ?? "";
-        const entryPoints = item.conferenceData?.entryPoints ?? [];
-        const entryMatch = entryPoints.some((entry) => entry.uri?.includes(meetingInfo.meetingCode));
-        return link.includes(meetingInfo.meetingCode) || entryMatch;
+        return item.hangoutLink === meetUrl;
       };
 
       try {
@@ -159,62 +156,64 @@ export default function MainStage() {
         }> = [];
 
         for (const calendar of calendars) {
-          const encodedCalendarId = encodeURIComponent(calendar.id);
-          const qParam = encodeURIComponent(meetUrl);
-          const baseUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events`;
-          const queryUrl = `${baseUrl}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&q=${qParam}&maxResults=250`;
+          if (calendar.id === user?.email) {
+            const encodedCalendarId = encodeURIComponent(calendar.id);
+            const qParam = encodeURIComponent(meetUrl);
+            const baseUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events`;
+            const queryUrl = `${baseUrl}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&q=${qParam}&maxResults=250`;
 
-          const response = await fetch(queryUrl, {
-            headers: { Authorization: `Bearer ${accessToken}` }
-          });
-
-          if (!response.ok) {
-            continue;
-          }
-
-          const data = (await response.json()) as {
-            items?: Array<{
-              hangoutLink?: string;
-              conferenceData?: {
-                entryPoints?: Array<{ uri?: string }>;
-              };
-              attendees?: Array<{
-                email: string;
-                displayName?: string;
-                responseStatus?: string;
-              }>;
-            }>;
-          };
-
-          let match = data.items?.find(matchMeeting);
-          if (!match) {
-            const fallbackUrl = `${baseUrl}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=250&orderBy=startTime`;
-            const fallbackResponse = await fetch(fallbackUrl, {
+            const response = await fetch(queryUrl, {
               headers: { Authorization: `Bearer ${accessToken}` }
             });
 
-            if (fallbackResponse.ok) {
-              const fallbackData = (await fallbackResponse.json()) as {
-                items?: Array<{
-                  hangoutLink?: string;
-                  conferenceData?: {
-                    entryPoints?: Array<{ uri?: string }>;
-                  };
-                  attendees?: Array<{
-                    email: string;
-                    displayName?: string;
-                    responseStatus?: string;
-                  }>;
-                }>;
-              };
-
-              match = fallbackData.items?.find(matchMeeting);
+            if (!response.ok) {
+              continue;
             }
-          }
 
-          if (match?.attendees?.length) {
-            foundAttendees = match.attendees;
-            break;
+            const data = (await response.json()) as {
+              items?: Array<{
+                hangoutLink?: string;
+                conferenceData?: {
+                  entryPoints?: Array<{ uri?: string }>;
+                };
+                attendees?: Array<{
+                  email: string;
+                  displayName?: string;
+                  responseStatus?: string;
+                }>;
+              }>;
+            };
+
+            let match = data.items?.find(matchMeeting);
+            if (!match) {
+              const fallbackUrl = `${baseUrl}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=250&orderBy=startTime`;
+              const fallbackResponse = await fetch(fallbackUrl, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+              });
+
+              if (fallbackResponse.ok) {
+                const fallbackData = (await fallbackResponse.json()) as {
+                  items?: Array<{
+                    hangoutLink?: string;
+                    conferenceData?: {
+                      entryPoints?: Array<{ uri?: string }>;
+                    };
+                    attendees?: Array<{
+                      email: string;
+                      displayName?: string;
+                      responseStatus?: string;
+                    }>;
+                  }>;
+                };
+
+                match = fallbackData.items?.find(matchMeeting);
+              }
+            }
+
+            if (match?.attendees?.length) {
+              foundAttendees = match.attendees;
+              break;
+            }
           }
         }
 
