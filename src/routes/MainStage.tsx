@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { meet, MeetingInfo, MeetMainStageClient } from '@googleworkspace/meet-addons/meet.addons';
-import { decodeJwtPayload } from "../utils/jwt";
-
 
 export default function MainStage() {
   const [mainStageClient, setMainStageClient] = useState<MeetMainStageClient>();
@@ -11,10 +9,15 @@ export default function MainStage() {
     email: string;
     picture: string;
   } | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [invitees, setInvitees] = useState<
+    Array<{ email: string; name?: string; responseStatus?: string }>
+  >([]);
   const [additionalData, setAdditionalData] = useState<string | undefined>(undefined);
 
-  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null);
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
@@ -32,30 +35,24 @@ export default function MainStage() {
       }
 
       const google = window.google;
-      if (google?.accounts?.id && googleButtonRef.current) {
-        google.accounts.id.initialize({
+      if (google?.accounts?.oauth2) {
+        tokenClientRef.current = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
-          callback: (response: google.accounts.id.CredentialResponse) => {
-            try {
-              const profile = decodeJwtPayload(response.credential);
-
-              setUser({
-                name: profile.name!,
-                email: profile.email!,
-                picture: profile.picture!,
-              });
-              setAuthError(null);
-            } catch (error) {
-              setAuthError((error as Error).message);
+          scope: [
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "openid"
+          ].join(" "),
+          callback: (response) => {
+            if (response.error) {
+              setAuthError(response.error);
+              return;
             }
-          }
-        });
 
-        google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: "outline",
-          size: "large",
-          text: "signin_with",
-          shape: "pill"
+            setAccessToken(response.access_token);
+            setAuthError(null);
+          }
         });
         return;
       }
@@ -64,7 +61,7 @@ export default function MainStage() {
       if (attempts < 10) {
         setTimeout(tryInit, 250);
       } else {
-        setAuthError("Google Sign-In failed to load.");
+        setAuthError("Google OAuth failed to load.");
       }
     };
 
@@ -74,6 +71,109 @@ export default function MainStage() {
       cancelled = true;
     };
   }, []);
+
+  const handleSignIn = () => {
+    if (!tokenClientRef.current) {
+      setAuthError("OAuth client is not ready yet.");
+      return;
+    }
+
+    tokenClientRef.current.requestAccessToken({ prompt: "consent" });
+  };
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Profile fetch failed (${response.status})`);
+        }
+
+        const profile = (await response.json()) as {
+          name?: string;
+          email?: string;
+          picture?: string;
+        };
+
+        setUser({
+          name: profile.name ?? "Signed in user",
+          email: profile.email ?? "unknown",
+          picture: profile.picture ?? ""
+        });
+      } catch (error) {
+        setAuthError((error as Error).message);
+      }
+    };
+
+    fetchProfile();
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken || !meetingInfo?.meetingCode) {
+      return;
+    }
+
+    const fetchInvitees = async () => {
+      setCalendarError(null);
+      try {
+        const timeMin = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const timeMax = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+        const query = encodeURIComponent(meetingInfo.meetingCode);
+
+        const response = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&q=${query}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Calendar fetch failed (${response.status})`);
+        }
+
+        const data = (await response.json()) as {
+          items?: Array<{
+            hangoutLink?: string;
+            conferenceData?: {
+              entryPoints?: Array<{ uri?: string }>;
+            };
+            attendees?: Array<{
+              email: string;
+              displayName?: string;
+              responseStatus?: string;
+            }>;
+          }>;
+        };
+
+        const match = data.items?.find((item) => {
+          const link = item.hangoutLink ?? "";
+          const entryPoints = item.conferenceData?.entryPoints ?? [];
+          const entryMatch = entryPoints.some((entry) => entry.uri?.includes(meetingInfo.meetingCode));
+          return link.includes(meetingInfo.meetingCode) || entryMatch;
+        });
+
+        const attendees = match?.attendees ?? [];
+        setInvitees(
+          attendees.map((attendee) => ({
+            email: attendee.email,
+            name: attendee.displayName,
+            responseStatus: attendee.responseStatus
+          }))
+        );
+      } catch (error) {
+        setCalendarError((error as Error).message);
+      }
+    };
+
+    fetchInvitees();
+  }, [accessToken, meetingInfo]);
 
   /**
    * Prepares the add-on Main Stage Client, which signals that the add-on
@@ -94,8 +194,6 @@ export default function MainStage() {
       setAdditionalData(activityStartingState.additionalData);
     })();
   }, []);
-
-  console.log(user);
 
   return (
     <section className="p-5 min-h-screen flex flex-col">
@@ -118,7 +216,15 @@ export default function MainStage() {
           </div>
         )}
 
-        {!user && <div><div ref={googleButtonRef} /></div>}
+        {!user && (
+          <button
+            type="button"
+            onClick={handleSignIn}
+            className="rounded-full border border-ink/10 bg-white/90 px-4 py-2 text-sm font-medium text-ink transition hover:-translate-y-0.5 hover:border-ink/30"
+          >
+            Sign in with Google
+          </button>
+        )}
 
       </nav>
       <div className="rounded-3xl bg-white/80 p-6 shadow-xl">
@@ -127,6 +233,31 @@ export default function MainStage() {
         <hr className="my-5" />
         <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Google Meet CODE</p>
         <h2 className="font-display text-2xl font-semibold text-ink">{meetingInfo?.meetingCode || "Loading..."}</h2>
+      </div>
+
+      <div className="mt-6 rounded-3xl bg-white/80 p-6 shadow-xl">
+        <p className="text-xs uppercase tracking-[0.3em] text-ink/60">Invitees (Calendar)</p>
+        {authError ? (
+          <p className="mt-3 text-sm text-coral">{authError}</p>
+        ) : calendarError ? (
+          <p className="mt-3 text-sm text-coral">{calendarError}</p>
+        ) : !accessToken ? (
+          <p className="mt-3 text-sm text-ink/70">Sign in to load invitees from Calendar.</p>
+        ) : invitees.length === 0 ? (
+          <p className="mt-3 text-sm text-ink/70">No invitees found for this meeting yet.</p>
+        ) : (
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {invitees.map((invitee) => (
+              <li key={invitee.email} className="rounded-2xl border border-ink/10 bg-haze/60 p-3">
+                <p className="text-sm font-semibold text-ink">{invitee.name ?? invitee.email}</p>
+                <p className="text-xs text-ink/60">{invitee.email}</p>
+                {invitee.responseStatus ? (
+                  <p className="mt-1 text-xs text-ink/50">Status: {invitee.responseStatus}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

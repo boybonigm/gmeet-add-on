@@ -3,6 +3,13 @@
 interface Window {
   google?: {
     accounts?: {
+      oauth2?: {
+        initTokenClient: (options: {
+          client_id: string;
+          scope: string;
+          callback: (response: google.accounts.oauth2.TokenResponse) => void;
+        }) => google.accounts.oauth2.TokenClient;
+      };
       id?: {
         initialize: (options: {
           client_id: string;
@@ -24,6 +31,21 @@ interface Window {
 
 declare namespace google {
   namespace accounts {
+    namespace oauth2 {
+      interface TokenResponse {
+        access_token: string;
+        expires_in: number;
+        token_type: string;
+        scope: string;
+        error?: string;
+        error_description?: string;
+      }
+
+      interface TokenClient {
+        requestAccessToken: (options?: { prompt?: "" | "consent" | "none" }) => void;
+      }
+    }
+
     namespace id {
       interface CredentialResponse {
         credential: string;
