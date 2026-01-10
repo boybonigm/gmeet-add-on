@@ -123,9 +123,10 @@ export default function MainStage() {
     const fetchInvitees = async () => {
       setCalendarError(null);
       try {
-        const timeMin = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        const timeMax = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-        const query = encodeURIComponent(meetingInfo.meetingCode);
+        const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const meetUrl = `https://meet.google.com/${meetingInfo.meetingCode}`;
+        const query = encodeURIComponent(meetUrl);
 
         const response = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&q=${query}`,
