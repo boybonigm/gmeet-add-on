@@ -151,7 +151,9 @@ export default function SidePanel() {
           </>
         )}
         {!user && (
+          <div className="flex items-center justify-center">
           <div ref={googleButtonRef} />
+          </div>
         )}
       </div>
     </section>
