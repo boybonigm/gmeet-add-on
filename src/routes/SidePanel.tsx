@@ -127,7 +127,7 @@ export default function SidePanel() {
   return (
     <section className="p-5 h-screen flex flex-col">
       <div className="rounded-3xl bg-white/80 p-6 shadow-xl flex flex-grow flex-col justify-center">
-        {authError && <p className="text-red-600 mb-5">{authError}</p>}
+        {authError && <p className="text-red-600 text-center mb-5">{authError}</p>}
         {user && (
           <>
           <div className="rounded-2xl border border-ink/10 bg-haze/60 p-4 mb-5">
