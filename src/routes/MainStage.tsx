@@ -122,47 +122,104 @@ export default function MainStage() {
 
     const fetchInvitees = async () => {
       setCalendarError(null);
-      try {
-        const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        const meetUrl = `https://meet.google.com/${meetingInfo.meetingCode}`;
-        const query = encodeURIComponent(meetUrl);
+      setInvitees([]);
 
-        const response = await fetch(
-          `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&q=${query}`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` }
-          }
+      const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const meetUrl = `https://meet.google.com/${meetingInfo.meetingCode}`;
+      const matchMeeting = (item: {
+        hangoutLink?: string;
+        conferenceData?: { entryPoints?: Array<{ uri?: string }> };
+      }) => {
+        const link = item.hangoutLink ?? "";
+        const entryPoints = item.conferenceData?.entryPoints ?? [];
+        const entryMatch = entryPoints.some((entry) => entry.uri?.includes(meetingInfo.meetingCode));
+        return link.includes(meetingInfo.meetingCode) || entryMatch;
+      };
+
+      try {
+        const calendarListResponse = await fetch(
+          "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
-        if (!response.ok) {
-          throw new Error(`Calendar fetch failed (${response.status})`);
+        if (!calendarListResponse.ok) {
+          throw new Error(`Calendar list fetch failed (${calendarListResponse.status})`);
         }
 
-        const data = (await response.json()) as {
-          items?: Array<{
-            hangoutLink?: string;
-            conferenceData?: {
-              entryPoints?: Array<{ uri?: string }>;
-            };
-            attendees?: Array<{
-              email: string;
-              displayName?: string;
-              responseStatus?: string;
-            }>;
-          }>;
+        const calendarListData = (await calendarListResponse.json()) as {
+          items?: Array<{ id: string; summary?: string }>;
         };
 
-        const match = data.items?.find((item) => {
-          const link = item.hangoutLink ?? "";
-          const entryPoints = item.conferenceData?.entryPoints ?? [];
-          const entryMatch = entryPoints.some((entry) => entry.uri?.includes(meetingInfo.meetingCode));
-          return link.includes(meetingInfo.meetingCode) || entryMatch;
-        });
+        const calendars = calendarListData.items ?? [];
+        let foundAttendees: Array<{
+          email: string;
+          displayName?: string;
+          responseStatus?: string;
+        }> = [];
 
-        const attendees = match?.attendees ?? [];
+        for (const calendar of calendars) {
+          const encodedCalendarId = encodeURIComponent(calendar.id);
+          const qParam = encodeURIComponent(meetUrl);
+          const baseUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events`;
+          const queryUrl = `${baseUrl}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&q=${qParam}&maxResults=250`;
+
+          const response = await fetch(queryUrl, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+
+          if (!response.ok) {
+            continue;
+          }
+
+          const data = (await response.json()) as {
+            items?: Array<{
+              hangoutLink?: string;
+              conferenceData?: {
+                entryPoints?: Array<{ uri?: string }>;
+              };
+              attendees?: Array<{
+                email: string;
+                displayName?: string;
+                responseStatus?: string;
+              }>;
+            }>;
+          };
+
+          let match = data.items?.find(matchMeeting);
+          if (!match) {
+            const fallbackUrl = `${baseUrl}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=250&orderBy=startTime`;
+            const fallbackResponse = await fetch(fallbackUrl, {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            if (fallbackResponse.ok) {
+              const fallbackData = (await fallbackResponse.json()) as {
+                items?: Array<{
+                  hangoutLink?: string;
+                  conferenceData?: {
+                    entryPoints?: Array<{ uri?: string }>;
+                  };
+                  attendees?: Array<{
+                    email: string;
+                    displayName?: string;
+                    responseStatus?: string;
+                  }>;
+                }>;
+              };
+
+              match = fallbackData.items?.find(matchMeeting);
+            }
+          }
+
+          if (match?.attendees?.length) {
+            foundAttendees = match.attendees;
+            break;
+          }
+        }
+
         setInvitees(
-          attendees.map((attendee) => ({
+          foundAttendees.map((attendee) => ({
             email: attendee.email,
             name: attendee.displayName,
             responseStatus: attendee.responseStatus
