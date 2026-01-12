@@ -156,7 +156,8 @@ export default function MainStage() {
         }> = [];
 
         for (const calendar of calendars) {
-
+          console.log(calendar.id, user.email);
+          
           if (calendar.id === user?.email) {
             const encodedCalendarId = encodeURIComponent(calendar.id);
             const qParam = encodeURIComponent(meetUrl);
