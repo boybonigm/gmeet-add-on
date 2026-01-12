@@ -308,9 +308,6 @@ export default function MainStage() {
               <li key={invitee.email} className="rounded-2xl border border-ink/10 bg-haze/60 p-3">
                 <p className="text-sm font-semibold text-ink">{invitee.name ?? invitee.email}</p>
                 <p className="text-xs text-ink/60">{invitee.email}</p>
-                {invitee.responseStatus ? (
-                  <p className="mt-1 text-xs text-ink/50">Status: {invitee.responseStatus}</p>
-                ) : null}
               </li>
             ))}
           </ul>
