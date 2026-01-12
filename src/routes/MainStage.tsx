@@ -116,7 +116,7 @@ export default function MainStage() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!accessToken || !meetingInfo?.meetingCode) {
+    if (!accessToken || !meetingInfo?.meetingCode || !user) {
       return;
     }
 
@@ -230,7 +230,7 @@ export default function MainStage() {
       }
     };
 
-    if(user) fetchInvitees();
+    fetchInvitees();
   }, [accessToken, meetingInfo, user]);
 
   /**
