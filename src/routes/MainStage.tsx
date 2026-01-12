@@ -156,6 +156,7 @@ export default function MainStage() {
         }> = [];
 
         for (const calendar of calendars) {
+
           if (calendar.id === user?.email) {
             const encodedCalendarId = encodeURIComponent(calendar.id);
             const qParam = encodeURIComponent(meetUrl);
@@ -229,8 +230,8 @@ export default function MainStage() {
       }
     };
 
-    fetchInvitees();
-  }, [accessToken, meetingInfo]);
+    if(user) fetchInvitees();
+  }, [accessToken, meetingInfo, user]);
 
   /**
    * Prepares the add-on Main Stage Client, which signals that the add-on
