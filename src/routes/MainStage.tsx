@@ -248,6 +248,8 @@ export default function MainStage() {
       const meetingInfo = await mainStage.getMeetingInfo();
       const activityStartingState = await mainStage.getActivityStartingState();
 
+      await mainStage.unloadSidePanel();
+
       setMainStageClient(mainStage);
       setMeetingInfo(meetingInfo);
       setAdditionalData(activityStartingState.additionalData);
@@ -257,7 +259,7 @@ export default function MainStage() {
   return (
     <section className="p-5 min-h-screen flex flex-col">
       <nav className="flex flex-row justify-between items-center gap-5 mb-5">
-        <h1 className="font-display text-3xl font-bold text-ink">TeamRetro</h1>
+        <h1 className="font-display text-3xl font-bold text-ink">Boy Add-on</h1>
 
         {user && (
           <div className="flex items-center gap-3">
